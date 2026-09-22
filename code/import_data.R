@@ -2,64 +2,51 @@ library(here)
 library(readr)
 library(tidyverse)
 library(arrow)
+library(lubridate)
 
 
 ## import data
 sr_data <- read_csv(here("data", "example_sr_data.csv"))
 screen_data <- read_parquet(here("data", "example_screen_data.parquet"))
-
-## plot data 
-
-## plot state on y axis
-bad_fig_1 <- 
-    screen_data |> 
-    filter(!is.na(state)) |> 
-    ggplot() + 
-    geom_segment(
-        aes(x = record_time, 
-            xend = end_time,
-            y = state, 
-            yend = state, 
-            color = state
-        ), 
-        linewidth = 10
-    )
-bad_fig_1
-
-ggsave(here("figures", "bad_fig_1.png"), bad_fig_1, width = 10, height = 5)
-
-
-## plot user_id on y axis and use color to differentiate state
-bad_fig_2 <- 
-    screen_data |> 
-    filter(!is.na(state)) |> 
-    ggplot() + 
-    geom_segment(
-        aes(x = record_time,
-            xend = end_time,
-            y = user_id,
-            yend = user_id,
-            color = state
-        ),
-        linewidth = 10
-    )
-bad_fig_2
-
-ggsave(here("figures", "bad_fig_2.png"), bad_fig_2, width = 10, height = 5)
-
-
-## fix labels for easier reading
-bad_fig_3 <- 
-    bad_fig_2 +
-    labs(
-        y = "",
-        x = "Date"
-    ) +
-    theme(
-        axis.text.y = element_blank()
-    )
+jerk_data <- read_parquet(here("data", "example_jerk_data.parquet"))
     
-bad_fig_3
 
+## wrangle data a bit
+screen_df <- 
+    screen_data |> 
+    filter(!is.na(state)) |> 
+    filter(!day_window == 9)
+
+sr_df <- 
+    sr_data |> 
+    mutate(
+        study_date = mdy(study_date),
+        time_to_bed   = mdy_hms(time_to_bed),
+        sleep_onset   = mdy_hms(sleep_onset),
+        sleep_offset  = mdy_hms(sleep_offset),
+        time_out_bed  = mdy_hms(time_out_bed)
+    ) |> 
+    mutate(
+        window_start = as.POSIXct(study_date - days(1)) + hours(16),
+        hours_time_to_bed = as.numeric(
+            difftime(time_to_bed, window_start, units = "hours")
+        ),
+        
+        hours_sleep_onset = as.numeric(
+            difftime(sleep_onset, window_start, units = "hours")
+        ),
+        
+        hours_sleep_offset = as.numeric(
+            difftime(sleep_offset, window_start, units = "hours")
+        ),
+        
+        hours_time_out_bed = as.numeric(
+            difftime(time_out_bed, window_start, units = "hours")
+        ) 
+    ) 
+
+jerk_df <- 
+    jerk_data |> 
+    filter(!day_window == 9)
 
 
